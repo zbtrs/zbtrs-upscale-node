@@ -28,6 +28,17 @@ class DragonUpscaleNode:
         return {
             "required": {
                 "image": ("IMAGE",),
+            },
+            "optional": {
+                "prompt": ("STRING", {"multiline": True, "default": "masterpiece, best quality, highres, <lora:more_details:0.5> <lora:SDXLrender_v2.0:1>"}),
+                "negative_prompt": ("STRING", {"multiline": True, "default": "(worst quality, low quality, normal quality:2) JuggernautNegative-neg"}),
+                "scale_factor": (["2", "4", "6", "8", "10", "12", "14", "16"],),
+                "dynamic": ("FLOAT", {"default": 6, "min": 0, "max": 10, "step": 1}),
+                "resemblance": ("FLOAT", {"default": 0.6, "min": 0.3, "max": 1.6, "step": 0.1}),
+                "creativity": ("FLOAT", {"default": 0.35, "min": 0, "max": 1, "step": 0.01}),
+                "tiling_width": ("FLOAT", {"default": 112, "min": 0, "max": 1000, "step": 1}),
+                "tiling_height": ("FLOAT", {"default": 144, "min": 0, "max": 1000, "step": 1}),
+                "num_inference_steps": ("FLOAT", {"default": 18, "min": 0, "max": 50, "step": 1}),
             }
         }
 
@@ -35,12 +46,23 @@ class DragonUpscaleNode:
     FUNCTION = "call"
     CATEGORY = "Dragon Upscaler"
 
-    def call(self, image):
+    def call(self, *args, **kwargs):
+        image = kwargs.get('image', None)
+        prompt = kwargs.get('prompt',"masterpiece, best quality, highres, <lora:more_details:0.5> <lora:SDXLrender_v2.0:1>")
+        negative_prompt = kwargs.get('negative_prompt','(worst quality, low quality, normal quality:2) JuggernautNegative-neg')
+        scale_factor = kwargs.get('scale_factor','2')
+        dynamic = kwargs.get('dynamic',6)
+        resemblance = kwargs.get('resemblance',0.6)
+        creativity = kwargs.get('creativity',0.35)
+        tiling_width = kwargs.get('tiling_width',112)
+        tiling_height = kwargs.get('tiling_height',144)
+        num_inference_steps = kwargs.get('num_inference_steps',18)
+        
         image_url = self.upload_to_cos(image)
         if not image_url:
             raise Exception("Failed to upload image to COS.")
 
-        response = self.upscale_image(image_url)
+        response = self.upscale_image(image_url,prompt,negative_prompt,scale_factor,dynamic,resemblance,creativity,tiling_width,tiling_height,num_inference_steps)
         if response.status_code == 200:
             base64_data = response.json().get("output")[0]
             return self.base64_to_image(base64_data)
@@ -66,14 +88,23 @@ class DragonUpscaleNode:
         else:
             return None
 
-    def upscale_image(self, image_url):
+    def upscale_image(self, image_url,prompt,negative_prompt,scale_factor,dynamic,resemblance,creativity,tiling_width,tiling_height,num_inference_steps):
         headers = {
             "accept": "application/json",
             "Content-Type": "application/json"
         }
         data = {
             "input": {
-                "image": image_url
+                "image": image_url,
+                "prompt": prompt,
+                "negative_prompt":negative_prompt,
+                "scale_factor":scale_factor,
+                "dynamic":dynamic,
+                "resemblance":resemblance,
+                "creativity":creativity,
+                "tiling_width":tiling_width,
+                "tiling_height":tiling_height,
+                "num_inference_steps":num_inference_steps
             }
         }
         response = requests.post(ROOT_API, headers=headers, json=data)
